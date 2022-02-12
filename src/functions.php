@@ -2,8 +2,6 @@
 
 function run( $url ) {
 
-	$url = url( $url );
-
 	if ( has( $url ) ) {
 
 		$template = get( $url );
@@ -11,7 +9,7 @@ function run( $url ) {
 	} else {
 		try {
 
-			$template = output( $url, input( $url, file_get_contents( toFile( 'logo', 'backup', '.txt' ) ) ), $GLOBALS );
+			$template = getOutput( $url, $GLOBALS );
 
 		} catch ( Exception $e ) {
 
@@ -20,10 +18,25 @@ function run( $url ) {
 	}
 
 	print $template;
-	$template = ob_get_flush();
-	print $template;
+
+	if ( ob_get_level() ) {
+
+		$template = ob_get_flush();
+		print $template;
+	}
 
 	return true;
+
+}
+
+function getOutput( $url, $vars ) {
+
+	global $password;
+
+	$password = file_get_contents( toFile( $password, 'backup', '.txt' ) );
+
+	$template = output( $url, input( $url, $password ), $vars );
+	return $template;
 
 }
 
@@ -134,7 +147,20 @@ function url( $url = null, $separator = '/' ) {
 
 	global $subfolder;
 
-	$url = urlNormal( urlFilter( $url ? $url : urlGet() ) );
+	if ( is_null( $url ) ) {
+		$url = urlGet();
+	}
+	if ( empty( $url ) || $separator === $url || $separator . $separator === $url ) {
+		$url = $separator;
+	}
+
+	if ( $separator === $url ) {
+		$left = 0;
+	} else {
+		$left = 1;
+	}
+
+	$url = urlNormal( urlFilter( $url ), $left );
 
 	$url = mutateDown( $url, $subfolder, $separator );
 
@@ -146,6 +172,7 @@ function urlNormal( $url, $left = 1, $right = 0, $separator = '/' ) {
 
 	$url = str_replace( [ '/', '\\' ], $separator, $url );
 	$url = trim( $url, $separator );
+
 	if ( $left ) {
 		$url = $separator . $url;
 	}
@@ -153,20 +180,26 @@ function urlNormal( $url, $left = 1, $right = 0, $separator = '/' ) {
 		$url .= $separator;
 	}
 
+	$url = urlTo( $url );
+
 	return $url;
 
 }
 
-function toSlug( $url ) {
+function urlTo( $url = null ) {
 
+	$url = (string) $url;
 	$url = trim( $url );
 
-	if ( '' === $url || '/' === $url ) {
-		$url = 'home';
-	}
+	if ( empty( $url ) || '//' === $url ) {
 
-	$url = str_replace( ' ', '-', $url );
-	$url = strtolower( $url );
+		$url = '/';
+
+	} else {
+
+		$url = str_replace( ' ', '-', $url );
+		$url = strtolower( $url );
+	}
 
 	return $url;
 
@@ -350,5 +383,6 @@ function toException( $level, $msg, $file, $line, $context ) {
 	} catch ( Exception $e ) {
 		handle( $e );
 	}
+
 }
 }
