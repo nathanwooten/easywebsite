@@ -335,7 +335,7 @@ function handle( $e, $code = null ) {
 	if ( $code ) {
 		throw $e;
 	}
-	die();
+	return false;
 
 }
 }
@@ -343,7 +343,10 @@ function handle( $e, $code = null ) {
 if ( ! function_exists( 'toException' ) ) {
 function toException( $level, $msg, $file, $line, $context ) {
 
-	throw new Exception( $msg . ' ' . $file . ' : ' . $line, $level );
-
+	try {
+		throw new Exception( $msg . ' ' . $file . ' : ' . $line, $level );
+	} catch ( Exception $e ) {
+		handle( $e );
+	}
 }
 }
