@@ -159,6 +159,8 @@ function urlNormal( $url, $left = 1, $right = 0, $separator = '/' ) {
 
 function toSlug( $url ) {
 
+	$url = trim( $url );
+
 	if ( '' === $url || '/' === $url ) {
 		$url = 'home';
 	}
