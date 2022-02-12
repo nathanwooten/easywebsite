@@ -62,7 +62,7 @@ function input( $url, $password ) {
 		$stmt->execute();
 
 		$content = $stmt->fetch();
-
+var_dump( $content );
 		if ( ! $content ) {
 			throw new Exception( 'Fetch returned false' );
 		}
@@ -85,11 +85,14 @@ function output( $url, $content, $vars = [] ) {
 	}
 
 	$template = file_get_contents( $file );
-
 	$template = str_replace( '{{article}}', $content[ 'content' ], $template );
-	foreach ( array_merge( $vars, $content ) as $var => $value ) {
 
-		$template = str_replace( '{$' . $var . '}', $value, $template );
+	$vars = array_merge( $vars, $content );
+
+	foreach ( $vars as $var => $value ) {
+		if ( is_string( $value ) ) {
+			$template = str_replace( '{$' . $var . '}', $value, $template );
+		}
 	}
 
 	$template = parse( toFile( $url, 'compile', '.php' ), $template );
@@ -117,11 +120,27 @@ function mutateUp( $mutate, $subfolder, $separator ) {
 
 function mutateDown( $mutate, $subfolder, $separator ) {
 
-	$subfolder = trim( str_replace( [ '/', '\\' ], $separator, $subfolder ), $separator );
+	$dir = false;
 
-	$mutate = $subfolder . $separator . trim( str_replace( [ '/', '\\' ], $separator, $mutate ), $separator ) . $separator;
+	$mutate = trim( str_replace( [ '/', '\\' ], $separator, $mutate ), $separator );
 
-	$dir = $mutate;
+	if ( ! $dir && '' === $mutate ) {
+		$dir = $separator;
+	} else {
+		$mutate = $separator . $mutate;
+	}
+
+	if ( ! $dir && empty( $subfolder ) ) {
+		$dir = $mutate;
+	}
+
+	if ( ! $dir ) {
+		$subfolder = trim( str_replace( [ '/', '\\' ], $separator, $subfolder ), $separator );
+
+		$mutate = $subfolder . $mutate;
+		$dir = $mutate;
+	}
+
 	return $dir;
 
 }
@@ -180,7 +199,10 @@ function urlNormal( $url, $left = 1, $right = 0, $separator = '/' ) {
 		$url .= $separator;
 	}
 
-	$url = urlTo( $url );
+	if ( empty( $url ) || '//' === $url ) {
+
+		$url = '/';
+	}
 
 	return $url;
 
@@ -191,17 +213,27 @@ function urlTo( $url = null ) {
 	$url = (string) $url;
 	$url = trim( $url );
 
-	if ( empty( $url ) || '//' === $url ) {
-
-		$url = '/';
-
-	} else {
-
-		$url = str_replace( ' ', '-', $url );
-		$url = strtolower( $url );
+	$home = urlHome( $url );
+	if ( $home ) {
+		return $home;
 	}
 
+	$url = str_replace( ' ', '-', $url );
+	$url = strtolower( $url );
+
 	return $url;
+
+}
+
+function urlHome( $url, $separator ) {
+
+	if ( empty( $url ) || '/' === $url || '\\' === $url ) {
+
+		$url = $separator;
+		return $url;
+	}
+
+	return false;
 
 }
 
@@ -248,8 +280,8 @@ function has( $url ) {
 function toFile( $url, $dir = '', $ext = '.php' ) {
 
 	$dir = empty( $dir ) ? '' : urlNormal( $dir, 0, 1, '/' );
-
 	$file = LIB . $dir . $url . $ext;
+
 	return $file;
 
 }
