@@ -2,9 +2,11 @@
 
 function run( $url ) {
 
-	if ( has( $url ) ) {
+	$url = urlNormal( $url );
 
-		$template = get( $url );
+	if ( has( urlHome( $url ) ) ) {
+
+		$template = get( urlHome( $url ) );
 
 	} else {
 		try {
@@ -17,13 +19,12 @@ function run( $url ) {
 		}
 	}
 
-	print $template;
+	while ( ob_get_level() ) {
 
-	if ( ob_get_level() ) {
-
-		$template = ob_get_flush();
-		print $template;
+		$template .= ob_get_flush();
 	}
+
+	print $template;
 
 	return true;
 
@@ -62,7 +63,7 @@ function input( $url, $password ) {
 		$stmt->execute();
 
 		$content = $stmt->fetch();
-var_dump( $content );
+
 		if ( ! $content ) {
 			throw new Exception( 'Fetch returned false' );
 		}
@@ -78,6 +79,11 @@ var_dump( $content );
 
 function output( $url, $content, $vars = [] ) {
 
+	$home = urlHome( $url );
+	if ( $home ) {
+		$url = $home;
+	}
+
 	try {
 		$file = toFile( 'template', 'templates', '.php' );
 	} catch ( Exception $e ) {
@@ -87,15 +93,15 @@ function output( $url, $content, $vars = [] ) {
 	$template = file_get_contents( $file );
 	$template = str_replace( '{{article}}', $content[ 'content' ], $template );
 
-	$vars = array_merge( $vars, $content );
+	$templates = [
+		'header' => file_get_contents( toFile( 'header', 'templates', '.php' ) ),
+		'article' => file_get_contents( toFile( 'article', 'templates', '.php' ) ),
+		'footer' => file_get_contents( toFile( 'footer', 'templates', '.php' ) )
+	];
 
-	foreach ( $vars as $var => $value ) {
-		if ( is_string( $value ) ) {
-			$template = str_replace( '{$' . $var . '}', $value, $template );
-		}
-	}
+	$vars = array_merge( $vars, $content, $templates );
 
-	$template = parse( toFile( $url, 'compile', '.php' ), $template );
+	$template = parse( $url, $template, $vars );
 
 	return $template;
 
@@ -225,11 +231,11 @@ function urlTo( $url = null ) {
 
 }
 
-function urlHome( $url, $separator ) {
+function urlHome( $url ) {
 
 	if ( empty( $url ) || '/' === $url || '\\' === $url ) {
 
-		$url = $separator;
+		$url = 'home';
 		return $url;
 	}
 
@@ -279,7 +285,16 @@ function has( $url ) {
 
 function toFile( $url, $dir = '', $ext = '.php' ) {
 
-	$dir = empty( $dir ) ? '' : urlNormal( $dir, 0, 1, '/' );
+	$dir = empty( $dir ) ? '' : urlNormal( $dir, 0, 1, DIRECTORY_SEPARATOR );
+
+	$url = urlNormal( $url );
+	$home = urlHome( $url );
+	if ( $home ) {
+		$url = $home;
+	}
+
+	$ext = is_null( $ext ) || empty( $ext ) ? '' : '.' . ltrim( $ext, '.' );
+
 	$file = LIB . $dir . $url . $ext;
 
 	return $file;
@@ -362,17 +377,25 @@ function inputFilterParagraphs( $convert ) {
 function parse( $filename, $content ) {
 
 	//inner ( content ) buffer
+
 	ob_start();
 
-	$file = toFile( $filename, 'compile' );
-	if ( $file ) {
-		include $file;
+	try {
+		$file = toFile( $filename, 'compile' );
+
+		$put = file_put_contents( $file, $content );
+
+		if ( $put ) {
+			include $file;
+		}
+		$contents = ob_get_contents();
+
+		ob_end_clean();
+
+		return $content;
+	} catch ( Exception $e ) {
+		return handle( $e );
 	}
-	$contents = ob_get_contents();
-
-	ob_end_clean();
-
-	return $content;
 
 }
 
